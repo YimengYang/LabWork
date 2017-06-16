@@ -3,6 +3,7 @@ import re
 import numpy as np
 import scipy as sp
 import matplotlib.pyplot as plt
+import pandas as pd
 def load_paths(data_dir='C:/data2/dg/'):
     all_subjects=_get_subjects(data_dir)
 
@@ -51,8 +52,8 @@ def cutoff(f,df):
     df_T_filtered.reset_index(inplace=True)
     return df_T_filtered
 
-def plot_shape(raw,filtered,df,windowL,windowR,Fs):
-    trial_starts = df['move_start'].values
+def plot_shape(raw,filtered,df,windowL,windowR,Fs,subj,electrode):
+    trial_starts = df['move_start'].astype(int).values
     N_trials = len(trial_starts)
     samps_window_lim = (windowL, windowR)
     N_samps = samps_window_lim[1] - samps_window_lim[0]
@@ -60,13 +61,24 @@ def plot_shape(raw,filtered,df,windowL,windowR,Fs):
     cycle_num = len(filtered)
     for i in range(cycle_num):
         rdsym_time_ts2[filtered['sample_lastE'][i]:filtered['sample_nextE'][i]] = filtered['rdsym_time'][i]
-        rdsym_time2 = np.zeros((N_trials,N_samps))
+
+    rdsym_time2 = np.zeros((N_trials,N_samps))
     for i, t in enumerate(trial_starts):
         rdsym_time2[i] = rdsym_time_ts2[t+samps_window_lim[0]:t+samps_window_lim[1]]
         avg_rdsym_time2 = np.nanmean(rdsym_time2,axis=0)
         sem_rdsym_time2 = sp.stats.sem(rdsym_time2,axis=0)
 
     t = np.arange(samps_window_lim[0]/Fs,samps_window_lim[1]/Fs,1/Fs)
+    plt.figure(figsize=(12,4))
     plt.plot(t,avg_rdsym_time2,'k-')
     plt.plot(t,avg_rdsym_time2-sem_rdsym_time2,'k--')
     plt.plot(t,avg_rdsym_time2+sem_rdsym_time2,'k--')
+    plt.savefig("C:/Users/Yimeng/Documents/GitHub/LabWork/plots/"+subj+electrode+".png")
+def drop_bad_trials(df,threshold,column,less=True,drop_other=True):
+    df_no_bad_trials = df.dropna()
+    if(drop_other):
+        if(less):
+            df_no_bad_trials = df_no_bad_trials[df_no_bad_trials[column]<threshold]
+        else:
+            df_no_bad_trials = df_no_bad_trials[df_no_bad_trials[column]>threshold]
+    return df_no_bad_trials
