@@ -65,15 +65,17 @@ def plot_shape(raw,filtered,df,windowL,windowR,Fs,subj,electrode):
     rdsym_time2 = np.zeros((N_trials,N_samps))
     for i, t in enumerate(trial_starts):
         rdsym_time2[i] = rdsym_time_ts2[t+samps_window_lim[0]:t+samps_window_lim[1]]
-        avg_rdsym_time2 = np.nanmean(rdsym_time2,axis=0)
-        sem_rdsym_time2 = sp.stats.sem(rdsym_time2,axis=0)
+    avg_rdsym_time2 = np.nanmean(rdsym_time2,axis=0)
+    sem_rdsym_time2 = sp.stats.sem(rdsym_time2,axis=0)
 
     t = np.arange(samps_window_lim[0]/Fs,samps_window_lim[1]/Fs,1/Fs)
-    plt.figure(figsize=(12,4))
-    plt.plot(t,avg_rdsym_time2,'k-')
-    plt.plot(t,avg_rdsym_time2-sem_rdsym_time2,'k--')
-    plt.plot(t,avg_rdsym_time2+sem_rdsym_time2,'k--')
-    plt.savefig("C:/Users/Yimeng/Documents/GitHub/LabWork/plots/"+subj+electrode+".png")
+    #plt.figure(figsize=(12,4))
+    #plt.plot(t,avg_rdsym_time2,'k-')
+    #plt.plot(t,avg_rdsym_time2-sem_rdsym_time2,'k--')
+    #plt.plot(t,avg_rdsym_time2+sem_rdsym_time2,'k--')
+    #plt.savefig("C:/Users/Yimeng/Documents/GitHub/LabWork/plots/"+subj+electrode+".png")
+    return rdsym_time2,avg_rdsym_time2,sem_rdsym_time2
+
 def drop_bad_trials(df,threshold,column,less=True,drop_other=True):
     df_no_bad_trials = df.dropna()
     if(drop_other):
