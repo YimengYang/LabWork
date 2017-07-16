@@ -84,3 +84,133 @@ def drop_bad_trials(df,threshold,column,less=True,drop_other=True):
         else:
             df_no_bad_trials = df_no_bad_trials[df_no_bad_trials[column]>threshold]
     return df_no_bad_trials
+
+# Functions for generating the dataframe for behavioral data
+def generateDataFrame(cue_diff,fingers, subj):
+    data_frame={}
+
+    #Find cue start and end for each trial
+    data_frame['cue_start']=np.where(cue_diff>0)[0]
+    data_frame['cue_end']=np.where(cue_diff<0)[0]
+
+    if subj == 'jp':
+        data_frame['cue_end'] = np.delete(data_frame['cue_end'],0)
+    elif subj == 'wm':
+        data_frame['cue_start'] = np.delete(data_frame['cue_start'],-1)
+
+    #Find corresponding fingers for each trial
+    data_frame['finger'] = np.array(cue_diff[data_frame['cue_start']])
+
+    data_frame['move_start'] = []
+    data_frame['move_end'] = []
+    for i in data_frame['cue_start']:
+        if sum(fingers['start'][cue_diff[i]-1]>i) >= 1:
+            data_frame['move_start'].append(fingers['start'][cue_diff[i]-1][fingers['start'][cue_diff[i]-1]>i][0])
+        else:
+            data_frame['move_start'].append(np.nan)
+    for i in data_frame['cue_end']:
+        if sum(fingers['end'][abs(cue_diff[i])-1]>i) >= 1:
+            data_frame['move_end'].append(fingers['end'][abs(cue_diff[i])-1][fingers['end'][abs(cue_diff[i])-1]>i][0])
+        else:
+            data_frame['move_end'].append(np.nan)
+    data_frame['move_start'] =  np.array(data_frame['move_start'])
+    data_frame['move_end'] = np.array(data_frame['move_end'])
+    data_frame['delay_start']=data_frame['move_start']-data_frame['cue_start']
+    data_frame['delay_end']=data_frame['move_end']-data_frame['cue_end']
+    data_frame['duration']=data_frame['move_end']-data_frame['move_start']
+    return data_frame
+
+def generateDataframeAll(all_cues_diff,all_subj_fingers):
+    dfs = []
+    data_frame_all=[]
+    for i in all_cues_diff.keys():
+        data_frame=generateDataFrame(all_cues_diff[i],all_subj_fingers[i], i)
+        dfs.append(pd.DataFrame.from_dict(data_frame))
+        data_frame_all.append(data_frame)
+        dfs[-1]['subject'] = i
+
+    return dfs,data_frame_all
+
+def getAllSubjects(data_dir, subjects,subj_name=2):
+    all_subjects = []
+    # Get all subject files
+    for sub in subjects:
+        # Get
+        if len(sub) == len(data_dir)+1+subj_name:
+            file_name = sub[-subj_name:]
+            all_subjects.append(file_name)
+    return all_subjects
+
+def loadCue(all_subjects,data_dir):
+    all_cues_diff={}
+    # Load cue for each subject and find start/stop times
+    for subjcode in all_subjects:
+
+        cue = np.load(data_dir+'/'+subjcode+'/cue.npy')
+        all_cues_diff[subjcode]=np.diff(cue)
+    return all_cues_diff
+
+def getAllMovement(all_subjects,data_dir):
+    all_subj_fingers={}
+
+    for subjcode in all_subjects:
+        # Compute finger start and stop times
+        all_subj_fingers[subjcode]={'start':{},'end':{}}
+        raw_finger=[]
+        for i in range(5):
+            finger = np.load(data_dir+'/'+subjcode+'/finger'+str(i)+'.npy')
+            raw_finger.append(finger)
+
+            all_subj_fingers[subjcode]['start'][i],all_subj_fingers[subjcode]['end'][i]=fingerStartEnd(finger)
+    return all_subj_fingers
+
+def getAllCue(all_subjects,all_cues_diff):
+    all_cues={}
+    for subjcode in all_subjects:
+        all_cues[subjcode]={'start':{},'end':{}}
+        for index in range(5):
+            all_cues[subjcode]['start'][index] = np.where(all_cues_diff==index+1)[0]
+            all_cues[subjcode]['end'][index] = np.where(all_cues_diff==-index-1)[0]
+    return all_cues
+
+def plotCueAndFinger(all_subjects,raw_finger,all_subj_fingers,all_cues):
+    for subjcode in all_subjects:
+        plt.figure(figsize=(16,8))
+
+        f, sub = plt.subplots(5, sharex=True,figsize=(16,8))
+        for k in range(5):
+            sub[k].plot(raw_finger[k])
+
+            for start,end in zip(all_subj_fingers[subjcode]['start'][k],all_subj_fingers[subjcode]['end'][k]):
+                sub[k].axvline(x=start, ymin=0, ymax = 3000, linewidth=2, color='k')
+                sub[k].axvline(x=end, ymin=0, ymax = 3000, linewidth=2, color='r', alpha=0.5)
+            for cueS, cueE in zip(all_cues[subjcode]['start'][k],all_cues[subjcode]['end'][k]):
+                sub[k].axvline(x=cueS, ymin=0, ymax = 3000, linewidth=2, color='g')
+                sub[k].axvline(x=cueE, ymin=0, ymax = 3000, linewidth=2, color='y')
+            plt.xlim(0,50000)
+# Delete movements unrelated to local cue
+def deleteStartEnd(fingers,interval):
+    for k in range(5):
+        for i, j in zip(fingers['start'][k],fingers['end'][k]):
+            if (j-i<interval):
+                fingers['start'][k].remove(i)
+                fingers['end'][k].remove(j)
+# Find start and end times of movement
+def fingerStartEnd (finger, thresh = 50, time_thresh = 1000):
+    all_start_samps = []
+    all_end_samps = []
+
+    finger_deriv = np.abs(np.diff(finger))
+    is_moving = finger_deriv > thresh
+    move_samples = np.argwhere(is_moving==1).transpose()[0]
+    move_samples_diff = np.diff(move_samples)
+
+    all_start_samps.append(move_samples[0])
+
+    N_samps = len(move_samples)
+    for i in range(1,N_samps):
+        if move_samples_diff[i-1] > time_thresh:
+            all_start_samps.append(move_samples[i])
+            all_end_samps.append(move_samples[i-1])
+    all_end_samps.append(move_samples[-1])
+    return np.array(all_start_samps), np.array(all_end_samps)
