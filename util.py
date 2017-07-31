@@ -214,3 +214,13 @@ def fingerStartEnd (finger, thresh = 50, time_thresh = 1000):
             all_end_samps.append(move_samples[i-1])
     all_end_samps.append(move_samples[-1])
     return np.array(all_start_samps), np.array(all_end_samps)
+def calculate_average(trial,label):
+    total = 0
+    if(len(trial)!=0):
+        for num in trial[label]:
+            total += num;
+        return total/len(trial)
+    return 0
+def dictionary_to_csv(dictionary,name):
+    for subj in dictionary.keys():
+        dictionary[subj].to_csv(name+subj+'.csv')
